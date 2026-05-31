@@ -114,48 +114,56 @@
   <script src="config.js"></script>
   <script src="api.js"></script>
 
-  <!-- Supabase client inline para evitar problemas de carga -->
+  <!-- Supabase client inline -->
   <script>
-    let supabase = null;
+    var _supa = null;
 
     function initSupabase() {
       if (CONFIG.SUPABASE_URL === "TU_SUPABASE_URL") return false;
-      supabase = window.supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY);
-      return true;
+      try {
+        _supa = window.supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY);
+        return true;
+      } catch(e) {
+        console.error("Supabase init error:", e);
+        return false;
+      }
     }
 
-    const SupaAuth = {
-      async getUser() {
-        if (!supabase) return null;
-        const { data: { user } } = await supabase.auth.getUser();
-        return user;
+    window.SupaAuth = {
+      getUser: async function() {
+        if (!_supa) return null;
+        var r = await _supa.auth.getUser();
+        return r.data.user;
       },
-      async getProfile(userId) {
-        const { data } = await supabase.from("profiles").select("*").eq("id", userId).single();
-        return data;
+      getProfile: async function(userId) {
+        var r = await _supa.from("profiles").select("*").eq("id", userId).single();
+        return r.data;
       },
-      async register(email, password, username) {
-        const { data: existing } = await supabase.from("profiles").select("id").eq("username", username).maybeSingle();
-        if (existing) throw new Error("Ese nombre de usuario ya está en uso");
-        const { data, error } = await supabase.auth.signUp({ email, password });
-        if (error) throw new Error(error.message);
-        const { error: profileError } = await supabase.from("profiles").insert({ id: data.user.id, username });
-        if (profileError) throw new Error(profileError.message);
-        return data;
+      register: async function(email, password, username) {
+        var ex = await _supa.from("profiles").select("id").eq("username", username).maybeSingle();
+        if (ex.data) throw new Error("Ese nombre de usuario ya está en uso");
+        var r = await _supa.auth.signUp({ email: email, password: password });
+        if (r.error) throw new Error(r.error.message);
+        var p = await _supa.from("profiles").insert({ id: r.data.user.id, username: username });
+        if (p.error) throw new Error(p.error.message);
+        return r.data;
       },
-      async login(email, password) {
-        const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-        if (error) throw new Error("Email o contraseña incorrectos");
-        return data;
+      login: async function(email, password) {
+        var r = await _supa.auth.signInWithPassword({ email: email, password: password });
+        if (r.error) throw new Error("Email o contraseña incorrectos");
+        return r.data;
       },
-      async logout() {
-        await supabase.auth.signOut();
+      logout: async function() {
+        if (_supa) await _supa.auth.signOut();
       },
-      onAuthChange(callback) {
-        if (!supabase) return;
-        supabase.auth.onAuthStateChange(callback);
-      },
+      onAuthChange: function(callback) {
+        if (!_supa) return;
+        _supa.auth.onAuthStateChange(callback);
+      }
     };
+
+    // exponer supabase para prode.js
+    window.getSupaClient = function() { return _supa; };
   </script>
 
   <script src="app.js"></script>

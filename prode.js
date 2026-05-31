@@ -214,8 +214,8 @@ const Prode = {
   },
 
   async loadMyPredictions() {
-    if (!this.user || !supabase) return;
-    const { data } = await supabase
+    if (!this.user || !window.getSupaClient()) return;
+    const { data } = await window.getSupaClient()
       .from("predictions")
       .select("*")
       .eq("user_id", this.user.id);
@@ -225,7 +225,7 @@ const Prode = {
       this.myPredictions[p.match_id] = { home: p.home_score, away: p.away_score };
     });
 
-    const { data: bonus } = await supabase
+    const { data: bonus } = await window.getSupaClient()
       .from("bonus_predictions")
       .select("*")
       .eq("user_id", this.user.id)
@@ -241,7 +241,7 @@ const Prode = {
     btn.disabled = true;
 
     try {
-      const { error } = await supabase
+      const { error } = await window.getSupaClient()
         .from("predictions")
         .upsert({
           user_id: this.user.id,
@@ -291,7 +291,7 @@ const Prode = {
     const container = document.getElementById("prode-matches");
     if (!container) return;
 
-    if (!supabase) {
+    if (!window.getSupaClient()) {
       container.innerHTML = `<div class="setup-warning">⚙️ Configurá Supabase en <code>config.js</code> para activar el prode.</div>`;
       return;
     }
@@ -385,8 +385,8 @@ const Prode = {
 
   // ── BONUS ───────────────────────────────────
   async loadBonusResults() {
-    if (!supabase) return;
-    const { data } = await supabase.from("bonus_results").select("*");
+    if (!window.getSupaClient()) return;
+    const { data } = await window.getSupaClient().from("bonus_results").select("*");
     this.bonusResults = {};
     (data || []).forEach(r => { this.bonusResults[r.key] = r.value; });
   },
@@ -405,7 +405,7 @@ const Prode = {
     btn.disabled = true;
 
     try {
-      const { error } = await supabase
+      const { error } = await window.getSupaClient()
         .from("bonus_predictions")
         .upsert({
           user_id: this.user.id,
@@ -504,7 +504,7 @@ const Prode = {
   async loadLeaderboard() {
     const container = document.getElementById("leaderboard-content");
     if (!container) return;
-    if (!supabase) {
+    if (!window.getSupaClient()) {
       container.innerHTML = `<div class="setup-warning">⚙️ Configurá Supabase para ver el ranking.</div>`;
       return;
     }
@@ -513,9 +513,9 @@ const Prode = {
 
     try {
       const [{ data: profiles }, { data: predictions }, { data: bonusPreds }] = await Promise.all([
-        supabase.from("profiles").select("*"),
-        supabase.from("predictions").select("*"),
-        supabase.from("bonus_predictions").select("*"),
+        window.getSupaClient().from("profiles").select("*"),
+        window.getSupaClient().from("predictions").select("*"),
+        window.getSupaClient().from("bonus_predictions").select("*"),
       ]);
 
       await this.loadBonusResults();
