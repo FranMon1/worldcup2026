@@ -4,8 +4,8 @@ const CONFIG = {
 
   // ── Supabase (prode) ──
   // Reemplazá con tus valores de supabase.com → Project Settings → API
-  SUPABASE_URL: "TU_SUPABASE_URL",
-  SUPABASE_ANON_KEY: "TU_SUPABASE_ANON_KEY",
+  SUPABASE_URL: "https://ghrjchfslrvsbqynpeiv.supabase.co",
+  SUPABASE_ANON_KEY: "sb_publishable_5L_a2c-AfGfvTo3EYiAX3w_L6DtbS3h",
 
   // ── Código del grupo ──
   // Compartilo con tus amigos para que puedan registrarse
