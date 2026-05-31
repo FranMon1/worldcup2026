@@ -465,31 +465,4 @@ function closeModal() {
   document.body.style.overflow = "";
 }
 
-// ── INIT ──
-document.addEventListener("DOMContentLoaded", () => {
-  // Nav
-  document.querySelectorAll("nav button[data-section]").forEach(btn => {
-    btn.addEventListener("click", () => {
-      const id = btn.dataset.section;
-      showSection(id);
-      if (id === "matches" && !state.matches.length) loadMatches();
-      if (id === "scorers" && !state.scorers.length) loadScorers();
-      if (id === "teams" && !state.teams.length) loadTeams();
-      if (id === "standings" && !state.standings.length) loadStandings();
-      if (id === "stats") {
-        if (!state.matches.length) loadMatches().then(renderStats);
-        if (!state.scorers.length) loadScorers().then(renderStats);
-        renderStats();
-      }
-    });
-  });
-
-  // Filters
-  document.querySelectorAll(".filter-btn").forEach(btn => {
-    btn.addEventListener("click", () => renderMatches(btn.dataset.filter));
-  });
-
-  // Load initial section
-  loadMatches();
-
-});
+// El nav y el init están en index.html para centralizar la lógica del prode
