@@ -22,17 +22,17 @@ const Prode = {
       return;
     }
 
-    SupaAuth.onAuthChange(async (event, session) => {
-      this.user = session?.user || null;
-      this.profile = this.user ? await SupaAuth.getProfile(this.user.id) : null;
-      this.updateHeaderAuth();
-      if (this.user) await this.loadMyPredictions();
+    window.SupaAuth.onAuthChange(async (event, session) => {
+      Prode.user = session?.user || null;
+      Prode.profile = Prode.user ? await window.SupaAuth.getProfile(Prode.user.id) : null;
+      Prode.updateHeaderAuth();
+      if (Prode.user) await Prode.loadMyPredictions();
     });
 
-    this.user = await SupaAuth.getUser();
-    if (this.user) {
-      this.profile = await SupaAuth.getProfile(this.user.id);
-      await this.loadMyPredictions();
+    Prode.user = await window.SupaAuth.getUser();
+    if (Prode.user) {
+      Prode.profile = await window.SupaAuth.getProfile(Prode.user.id);
+      await Prode.loadMyPredictions();
     }
 
     this.updateHeaderAuth();
@@ -150,8 +150,24 @@ const Prode = {
     errEl.style.display = "none";
 
     try {
-      await SupaAuth.login(email, password);
-      closeModal();
+      await window.SupaAuth.login(email, password);
+
+      // Cerrar modal de forma directa
+      const overlay = document.getElementById("modal-overlay");
+      if (overlay) { overlay.style.display = "none"; }
+      document.body.style.overflow = "";
+
+      // Actualizar estado del usuario manualmente
+      Prode.user = await window.SupaAuth.getUser();
+      if (Prode.user) Prode.profile = await window.SupaAuth.getProfile(Prode.user.id);
+      Prode.updateHeaderAuth();
+      if (Prode.user) await Prode.loadMyPredictions();
+
+      // Re-renderizar la sección activa si es prode o bonus
+      const active = document.querySelector(".section.active");
+      if (active?.id === "prode") Prode.renderProdeSection();
+      if (active?.id === "bonus") Prode.renderBonusSection();
+
     } catch (err) {
       errEl.textContent = err.message;
       errEl.style.display = "block";
@@ -180,14 +196,16 @@ const Prode = {
     errEl.style.display = "none";
 
     try {
-      await SupaAuth.register(email, password, username);
-      closeModal();
+      await window.SupaAuth.register(email, password, username);
+      const overlay = document.getElementById("modal-overlay");
+      if (overlay) overlay.style.display = "none";
+      document.body.style.overflow = "";
       openModal(`
         <div style="text-align:center;padding:2rem">
           <div style="font-size:3rem;margin-bottom:1rem">🎉</div>
           <h3 style="font-size:1.1rem;margin-bottom:0.5rem">¡Ya estás en el prode!</h3>
-          <p style="color:var(--text-muted);font-size:0.85rem">Revisá tu email para confirmar tu cuenta, luego iniciá sesión.</p>
-          <button class="auth-submit" style="margin-top:1.5rem" onclick="closeModal()">Cerrar</button>
+          <p style="color:var(--text-muted);font-size:0.85rem">Iniciá sesión con tu email y contraseña.</p>
+          <button class="auth-submit" style="margin-top:1.5rem" onclick="Prode.showAuthModal('login')">Iniciar sesión</button>
         </div>`);
     } catch (err) {
       errEl.textContent = err.message;
@@ -198,10 +216,16 @@ const Prode = {
   },
 
   async handleLogout() {
-    await SupaAuth.logout();
-    this.myPredictions = {};
-    this.myBonus = null;
-    this.updateHeaderAuth();
+    await window.SupaAuth.logout();
+    Prode.user = null;
+    Prode.profile = null;
+    Prode.myPredictions = {};
+    Prode.myBonus = null;
+    Prode.updateHeaderAuth();
+    // Re-render sección activa
+    const active = document.querySelector(".section.active");
+    if (active?.id === "prode") Prode.renderProdeSection();
+    if (active?.id === "bonus") Prode.renderBonusSection();
   },
 
   // ── PREDICCIONES ────────────────────────────
@@ -214,46 +238,61 @@ const Prode = {
   },
 
   async loadMyPredictions() {
-    if (!this.user || !window.getSupaClient()) return;
-    const { data } = await window.getSupaClient()
+    if (!Prode.user || !window.getSupaClient()) return;
+    const sc = window.getSupaClient();
+
+    const { data } = await sc
       .from("predictions")
       .select("*")
-      .eq("user_id", this.user.id);
+      .eq("user_id", Prode.user.id);
 
-    this.myPredictions = {};
+    Prode.myPredictions = {};
     (data || []).forEach(p => {
-      this.myPredictions[p.match_id] = { home: p.home_score, away: p.away_score };
+      Prode.myPredictions[p.match_id] = { home: p.home_score, away: p.away_score };
     });
 
-    const { data: bonus } = await window.getSupaClient()
+    const { data: bonus } = await sc
       .from("bonus_predictions")
       .select("*")
-      .eq("user_id", this.user.id)
+      .eq("user_id", Prode.user.id)
       .maybeSingle();
-    this.myBonus = bonus;
+    Prode.myBonus = bonus;
   },
 
   async savePrediction(matchId, homeScore, awayScore, btn) {
-    if (!this.user) { this.showAuthModal("login"); return; }
+    // Si no hay usuario, pedir login
+    if (!Prode.user) { Prode.showAuthModal("login"); return; }
 
-    const original = btn.textContent;
+    const sc = window.getSupaClient();
+    if (!sc) {
+      btn.textContent = "Sin conexión DB";
+      return;
+    }
+
+    const hVal = parseInt(homeScore);
+    const aVal = parseInt(awayScore);
+    if (isNaN(hVal) || isNaN(aVal)) {
+      btn.textContent = "Ingresá un número";
+      setTimeout(() => { btn.textContent = btn.dataset.orig || "Guardar"; }, 1500);
+      return;
+    }
+
+    btn.dataset.orig = btn.textContent;
     btn.textContent = "...";
     btn.disabled = true;
 
     try {
-      const { error } = await window.getSupaClient()
-        .from("predictions")
-        .upsert({
-          user_id: this.user.id,
-          match_id: matchId,
-          home_score: parseInt(homeScore),
-          away_score: parseInt(awayScore),
-        }, { onConflict: "user_id,match_id" });
+      const { error } = await sc.from("predictions").upsert({
+        user_id: Prode.user.id,
+        match_id: Number(matchId),
+        home_score: hVal,
+        away_score: aVal,
+      }, { onConflict: "user_id,match_id" });
 
       if (error) throw error;
 
-      this.myPredictions[matchId] = { home: parseInt(homeScore), away: parseInt(awayScore) };
-      btn.textContent = "✓";
+      Prode.myPredictions[matchId] = { home: hVal, away: aVal };
+      btn.textContent = "✓ Guardado";
       btn.style.background = "var(--green)";
       setTimeout(() => {
         btn.textContent = "Actualizar";
@@ -261,9 +300,13 @@ const Prode = {
         btn.disabled = false;
       }, 1500);
     } catch (err) {
-      btn.textContent = "Error";
-      btn.disabled = false;
-      console.error(err);
+      btn.textContent = "Error: " + (err.message || "intenta de nuevo");
+      btn.style.background = "var(--red)";
+      setTimeout(() => {
+        btn.textContent = btn.dataset.orig || "Guardar";
+        btn.style.background = "";
+        btn.disabled = false;
+      }, 3000);
     }
   },
 
@@ -396,9 +439,9 @@ const Prode = {
     if (this.isBonusLocked()) return;
 
     const champion = document.getElementById("bonus-champion")?.value.trim();
-    const runnerUp = document.getElementById("bonus-runner-up")?.value.trim();
-    const topScorer = document.getElementById("bonus-top-scorer")?.value.trim();
-    const bestPlayer = document.getElementById("bonus-best-player")?.value.trim();
+    const runnerUp = document.getElementById("bonus-runner_up")?.value.trim();
+    const topScorer = document.getElementById("bonus-top_scorer")?.value.trim();
+    const bestPlayer = document.getElementById("bonus-best_player")?.value.trim();
 
     const btn = document.getElementById("bonus-save-btn");
     btn.textContent = "Guardando...";
@@ -526,7 +569,7 @@ const Prode = {
         const userPreds = (predictions || []).filter(p => p.user_id === profile.id);
         let matchPoints = 0;
         userPreds.forEach(p => {
-          const match = finishedMatches.find(m => m.id === p.match_id);
+          const match = finishedMatches.find(m => Number(m.id) === Number(p.match_id));
           if (match) {
             const ah = match.score?.fullTime?.home;
             const aa = match.score?.fullTime?.away;
@@ -598,8 +641,8 @@ const Prode = {
                 <strong>${r.username}</strong>
                 ${this.user?.id === r.userId ? ' <span style="color:var(--accent2);font-size:0.7rem">(vos)</span>' : ""}
               </td>
-              <td><span class="pts-badge pts-${r.matchPoints}">${r.matchPoints}</span></td>
-              <td><span class="pts-badge pts-${r.bonusPoints}">${r.bonusPoints}</span></td>
+              <td><span class="pts-badge ${r.matchPoints > 0 ? "pts-3" : "pts-0"}">${r.matchPoints}</span></td>
+              <td><span class="pts-badge ${r.bonusPoints > 0 ? "pts-5" : "pts-0"}">${r.bonusPoints}</span></td>
               <td class="pts" style="font-size:1rem">${r.total}</td>
             </tr>`).join("")}
         </tbody>

@@ -144,6 +144,7 @@
         if (ex.data) throw new Error("Ese nombre de usuario ya está en uso");
         var r = await _supa.auth.signUp({ email: email, password: password });
         if (r.error) throw new Error(r.error.message);
+        if (!r.data || !r.data.user) throw new Error("Registración incompleta. Revisá tu email.");
         var p = await _supa.from("profiles").insert({ id: r.data.user.id, username: username });
         if (p.error) throw new Error(p.error.message);
         return r.data;
